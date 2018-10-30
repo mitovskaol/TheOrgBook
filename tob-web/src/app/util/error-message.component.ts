@@ -30,7 +30,11 @@ export class ErrorMessageComponent {
     return ret;
   }
 
-  notFound(): boolean {
-    return this.error && this.error.obj && this.error.obj.status === 404;
+  get notFound(): boolean {
+    let err = this.error;
+    if(err) {
+      if(err.obj) err = err.obj;
+      return err && err.status === 404;
+    }
   }
 }

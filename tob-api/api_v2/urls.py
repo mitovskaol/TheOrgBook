@@ -1,52 +1,57 @@
+from django.conf import settings
 from django.conf.urls import url
 from rest_framework.urlpatterns import format_suffix_patterns
 from rest_framework.routers import SimpleRouter
+from rest_framework.permissions import DjangoModelPermissionsOrAnonReadOnly, AllowAny
 
-from .swagger import SwaggerSchemaView
 from api_v2.views import misc, rest, search
+
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+
+API_METADATA = settings.API_METADATA
+schema_view = get_schema_view(
+    openapi.Info(
+        title=API_METADATA["title"],
+        default_version="v2",
+        description=API_METADATA["description"],
+        terms_of_service=API_METADATA["terms"]["url"],
+        contact=openapi.Contact(**API_METADATA["contact"]),
+        license=openapi.License(**API_METADATA["license"]),
+    ),
+    url="{}/api".format(settings.APPLICATION_URL),
+    validators=["flex", "ssv"],
+    public=True,
+    permission_classes=(AllowAny,),
+)
 
 router = SimpleRouter(trailing_slash=False)
 
-router.register(r"issuer", rest.IssuerViewSet, "Issuer")
-router.register(r"schema", rest.SchemaViewSet, "Schema")
-router.register(
-    r"credentialtype", rest.CredentialTypeViewSet, "CredentialType"
-)
-router.register(r"topic", rest.TopicViewSet, "Topic")
-router.register(r"credential", rest.CredentialViewSet, "Credential")
-router.register(r"address", rest.AddressViewSet, "Address")
-router.register(r"contact", rest.ContactViewSet, "Contact")
-router.register(r"name", rest.NameViewSet, "Name")
-router.register(r"person", rest.PersonViewSet, "Person")
-router.register(r"category", rest.CategoryViewSet, "Category")
+router.register(r"issuer", rest.IssuerViewSet)
+router.register(r"schema", rest.SchemaViewSet)
+router.register(r"credentialtype", rest.CredentialTypeViewSet)
+router.register(r"address", rest.AddressViewSet)
+router.register(r"attribute", rest.AttributeViewSet)
+router.register(r"credential", rest.CredentialViewSet)
+router.register(r"name", rest.NameViewSet)
+router.register(r"topic", rest.TopicViewSet)
 
 # Search endpoints
-router.register(r"search/credential/topic", search.CredentialTopicSearchView, "Credential Topic Search")
+router.register(
+    r"search/credential/topic",
+    search.CredentialTopicSearchView,
+    "Credential Topic Search",
+)
 router.register(r"search/credential", search.CredentialSearchView, "Credential Search")
-searchPatterns = [
-    url(r"^search/autocomplete$", search.NameAutocompleteView.as_view()),
-]
+searchPatterns = [url(r"^search/autocomplete$", search.NameAutocompleteView.as_view())]
 
 # Misc endpoints
-miscPatterns = [
-    # Swagger documentation
-    url(r'^$', SwaggerSchemaView.as_view()),
-    # Stats and cacheable info for home page
-    url(r"^quickload$", misc.quickload),
+miscPatterns = [url(r"^quickload$", misc.quickload)]
+
+swaggerPatterns = [
+    url(r"^$", schema_view.with_ui("swagger", cache_timeout=None), name="api-docs")
 ]
 
-# Indy endpoints (now handled elsewhere)
-#indyPatterns = [
-#    url(
-#        r"^indy/generate-credential-request$", indy.generate_credential_request
-#    ),
-#    url(r"^indy/store-credential$", indy.store_credential),
-#    url(r"^indy/register-issuer$", indy.register_issuer),
-#    url(r"^indy/construct-proof$", indy.construct_proof),
-#    url(r"^indy/status$", indy.status),
-#    url(r"^credential/(?P<id>[0-9]+)/verify$", indy.verify_credential),
-#]
-
 urlpatterns = format_suffix_patterns(
-    router.urls + searchPatterns + miscPatterns # + indyPatterns
+    router.urls + searchPatterns + miscPatterns + swaggerPatterns
 )

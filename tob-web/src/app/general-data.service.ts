@@ -1,20 +1,24 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { BehaviorSubject } from 'rxjs/BehaviorSubject';
 import { Observable } from 'rxjs/Observable';
+import { Subscription } from 'rxjs/Subscription';
+import { map, catchError } from 'rxjs/operators';
+import { _throw } from 'rxjs/observable/throw';
 import { environment } from '../environments/environment';
 import { Fetch } from './data-types';
-import 'rxjs/add/operator/map';
-import 'rxjs/add/operator/catch';
-import 'rxjs/add/observable/throw';
 
 
 @Injectable()
 export class GeneralDataService {
 
   public apiUrl = environment.API_URL;
-  private quickLoaded = false;
-  private orgData : {[key: string]: any} = {};
-  private recordCounts : {[key: string]: number} = {};
+  private _quickLoaded = false;
+  private _orgData : {[key: string]: any} = {};
+  private _recordCounts : {[key: string]: number} = {};
+  private _currentResultSubj = new BehaviorSubject<Fetch.BaseResult<any>>(null);
+  private _loaderSub: Subscription = null;
+  private _defaultTopicType = 'registration';
 
   constructor(private _http: HttpClient) {
   }
@@ -32,12 +36,16 @@ export class GeneralDataService {
     }
   }
 
+  get defaultTopicType(): string {
+    return this._defaultTopicType;
+  }
+
   loadJson(url, params?: HttpParams) : Observable<Object> {
     return this._http.get(url, {params: params})
-      .catch(error => {
+      .pipe(catchError(error => {
         console.error("JSON load error", error);
         return Observable.throw(error);
-      });
+      }));
   }
 
   loadFromApi(path: string, params?: HttpParams) : Observable<Object> {
@@ -49,7 +57,7 @@ export class GeneralDataService {
 
   quickLoad(force?) {
     return new Promise((resolve, reject) => {
-      if(this.quickLoaded && !force) {
+      if(this._quickLoaded && !force) {
         resolve(1);
         return;
       }
@@ -60,23 +68,23 @@ export class GeneralDataService {
         return;
       }
       let req = this._http.get(baseurl + 'quickload')
-        .catch(error => {
+        .pipe(catchError(error => {
           console.error(error);
-          return Observable.throw(error);
-        });
-      req.subscribe(data => {
+          return _throw(error);
+        }));
+      req.subscribe((data: any) => {
         console.log('quickload', data);
         if(data.counts) {
           for (let k in data.counts) {
-            this.recordCounts[k] = parseInt(data.counts[k]);
+            this._recordCounts[k] = parseInt(data.counts[k]);
           }
         }
         if(data.records) {
           for (let k in data.records) {
-            this.orgData[k] = data.records[k];
+            this._orgData[k] = data.records[k];
           }
         }
-        this.quickLoaded = true;
+        this._quickLoaded = true;
         resolve(1);
       }, err => {
         reject(err);
@@ -85,7 +93,7 @@ export class GeneralDataService {
   }
 
   getRecordCount (type) {
-    return this.recordCounts[type] || 0;
+    return this._recordCounts[type] || 0;
   }
 
   autocomplete (term) : Observable<Object> {
@@ -94,7 +102,7 @@ export class GeneralDataService {
     }
     let params = new HttpParams().set('q', term);
     return this.loadFromApi('search/autocomplete', params)
-      .map(response => response["result"]);
+      .pipe(map(response => response["result"]));
   }
 
   makeHttpParams(query?: { [key: string ]: string } | HttpParams) {
@@ -134,23 +142,39 @@ export class GeneralDataService {
   loadData <T, R extends Fetch.BaseResult<T>>(fetch: Fetch.BaseLoader<T,R>, path: string, params?: { [key: string ]: any }) {
     if(! params) params = {};
     if(! path)
+      // fetch.loadNotFound
       fetch.loadError("Undefined resource path");
     else {
       let httpParams = this.makeHttpParams(params.query);
       let url = this.getRequestUrl(path);
+      if(params.primary) {
+        if(this._loaderSub)
+          this._loaderSub.unsubscribe();
+        this._loaderSub = fetch.stream.subscribe((result) => {
+          this.setCurrentResult(result);
+        });
+      }
       fetch.loadFrom(this.loadJson(url, httpParams), {url: url});
     }
+  }
+
+  onCurrentResult(sub): Subscription {
+    return this._currentResultSubj.subscribe(sub);
+  }
+
+  setCurrentResult(result: Fetch.BaseResult<any>) {
+    this._currentResultSubj.next(result);
   }
 
   deleteRecord (mod: string, id: string) {
     return new Promise(resolve => {
       let baseurl = this.getRequestUrl(mod + '/' + id + '/delete');
       let req = this._http.post(baseurl, {params: {id}})
-        .catch(error => {
+        .pipe(catchError(error => {
           console.error(error);
           resolve(null);
-          return Observable.throw(error);
-        });
+          return _throw(error);
+        }));
       req.subscribe(data => {
         console.log('delete result', data);
         resolve(data);
@@ -159,4 +183,3 @@ export class GeneralDataService {
   }
 
 }
-

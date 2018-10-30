@@ -11,10 +11,7 @@ https://docs.djangoproject.com/en/1.9/ref/settings/
 """
 
 import os
-import posixpath
-import logging.config
 import os.path
-import glob
 
 from pathlib import Path
 
@@ -31,6 +28,9 @@ try:
 except:
     import haystack
 
+def parse_bool(val):
+    return val and val != '0' and str(val).lower() != "false"
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -46,7 +46,7 @@ SECRET_KEY = os.getenv(
 )
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DJANGO_DEBUG", "True") == "True"
+DEBUG = parse_bool(os.getenv("DJANGO_DEBUG", "True"))
 
 ALLOWED_HOSTS = ["*"]
 
@@ -63,9 +63,10 @@ INSTALLED_APPS = [
     "haystack",
     "rest_framework",
     "drf_generators",
-    "rest_framework_swagger",
+    "drf_yasg",
     "auditable",
     "api",
+    "tob_api",
     "api_v2",
     "corsheaders",
 ]
@@ -122,6 +123,7 @@ WSGI_APPLICATION = "wsgi.application"
 
 DATABASES = {"default": database.config()}
 
+OPTIMIZE_TABLE_ROW_COUNTS = parse_bool(os.getenv("OPTIMIZE_TABLE_ROW_COUNTS", "True"))
 
 # Password validation
 # https://docs.djangoproject.com/en/1.9/ref/settings/#auth-password-validators
@@ -244,7 +246,27 @@ if os.getenv("SQL_DEBUG"):
     }
 
 INDY_HOLDER_ID = "TheOrgBook_Holder"
-INDY_VERIFIER_ID = "TheOrgBook_Verifier"
+
+APPLICATION_URL = os.getenv("APPLICATION_URL") or "http://localhost:8080"
+
+API_METADATA = {
+    "title": "TheOrgBook API",
+    "description":
+        "TheOrgBook is a public, searchable directory of digital records for registered "
+        "businesses in the Province of British Columbia. Over time, other government "
+        "organizations and businesses will also begin to issue digital records through "
+        "TheOrgBook. For example, permits and licenses issued by various government services.",
+    "terms": {
+        "url": "https://www2.gov.bc.ca/gov/content/data/open-data",
+    },
+    "contact": {
+        "email": "bcdevexchange@gov.bc.ca",
+    },
+    "license": {
+        "name": "Open Government License - British Columbia",
+        "url": "https://www2.gov.bc.ca/gov/content/data/open-data/api-terms-of-use-for-ogl-information",
+    },
+}
 
 custom_settings_file = Path(
     BASE_DIR,

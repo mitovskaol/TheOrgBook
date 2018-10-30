@@ -27,7 +27,7 @@ export class IssuerFormComponent implements OnInit, OnDestroy {
     });
     this._idSub = this._route.params.subscribe(params => {
       this.id = +params['issuerId'];
-      this._dataService.loadRecord(this._loader, this.id);
+      this._dataService.loadRecord(this._loader, this.id, {primary: true});
     });
   }
 
@@ -36,6 +36,14 @@ export class IssuerFormComponent implements OnInit, OnDestroy {
     this._loader.complete();
     this._credTypes.complete();
   }
+
+  get fullDid() {
+    let did = this.result.data.did;
+    if(did && ! did.startsWith('did:sov:'))
+      did = `did:sov:${did}`;
+    return did;
+  }
+
 
   get result() {
     return this._loader.result;

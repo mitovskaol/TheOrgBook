@@ -8,17 +8,17 @@ function load_data<T>(
     attr_map?: {[key: string]: any},
     list_map?: {[key: string]: any}): T {
   if(obj && result) {
-    Object.assign(obj, result);
-    if(attr_map) {
-      for(let k in attr_map) {
+    for(let k in result) {
+      if(attr_map && k in attr_map) {
         obj[k] = (result[k] === null || result[k] === undefined)
           ? null : (new Model[attr_map[k]])._load(result[k]);
       }
-    }
-    if(list_map) {
-      for(let k in list_map) {
+      else if(list_map && k in list_map) {
         obj[k] = (result[k] === null || result[k] === undefined)
           ? [] : result[k].map((v) => (new Model[list_map[k]])._load(v));
+      }
+      else {
+        obj[k] = result[k];
       }
     }
   }
@@ -45,7 +45,7 @@ export namespace Model {
     static extPath: string;
 
     constructor(data?: any) {
-      if(data !== undefined && data !== null) {
+      if(data) {
         this._load(data);
       }
     }
@@ -54,6 +54,20 @@ export namespace Model {
       let ctor = (this.constructor as ModelCtor<T>);
       return load_data(this, result, ctor.propertyMap, ctor.listPropertyMap);
     }
+
+    get pageTitle(): string {
+      return null;
+    }
+  }
+
+  function mapByType<T extends {type: string}>(input: T[]): {[key: string]: T} {
+    let result = {};
+    if(input) {
+      for(let obj of input) {
+        result[obj.type] = obj;
+      }
+    }
+    return result;
   }
 
   export class Address extends BaseModel {
@@ -65,38 +79,31 @@ export namespace Model {
     postal_code: string;
     country: string;
     address_type: string;
+    credential_id: number;
+    inactive: boolean;
 
     static resourceName = 'address';
   }
 
-  export class Category extends BaseModel {
+  export class Attribute extends BaseModel {
     id: number;
     type: string;
+    format: string;
     value: string;
-
-    static resourceName = 'category';
-  }
-
-  export class Contact extends BaseModel {
-    id: number;
-    credential: Credential;
-    text: string;
-    type: string;
-    startDate: string;
-    endDate: string;
-
-    static resourceName = 'contact';
-
-    static propertyMap = {
-      credential: 'Credential',
-    };
+    credential_id: number;
+    inactive: boolean;
 
     get typeClass(): string {
-      var t = this.type;
-      if(t === 'contact.email') return 'email';
-      if(t === 'contact.phone' || t == 'contact.phone-business') return 'phone';
-      if(t === 'contact.website') return 'website';
-      return 'contact';
+      if(this.format === 'email' || this.format === 'phone' || this.format === 'name')
+        return this.format;
+      if(this.format === 'url')
+        return 'website';
+    }
+
+    get typeLabel(): string {
+      if(this.type && ! ~this.type.indexOf('.'))
+        return `attribute.${this.type}`;
+      return this.type;
     }
   }
 
@@ -104,14 +111,18 @@ export namespace Model {
     id: number;
     credential_type: CredentialType;
     effective_date: string;
-    revoked: string;
+    inactive: boolean;
+    revoked: boolean;
 
     addresses: Address[];
-    categories: Category[];
-    contacts: Contact[];
+    _attributes: Attribute[];
+    _attribute_map: {[key: string]: Attribute};
     names: Name[];
-    people: Person[];
     topic: Topic;
+
+    get pageTitle(): string {
+      return this.credential_type && this.credential_type.description;
+    }
 
     static resourceName = 'credential';
 
@@ -121,11 +132,21 @@ export namespace Model {
     };
     static listPropertyMap = {
       addresses: 'Address',
-      categories: 'Category',
-      contacts: 'Contact',
+      attributes: 'Attribute',
       names: 'Name',
-      people: 'Person',
     };
+
+    get attributes(): Attribute[] {
+      return this._attributes;
+    }
+    set attributes(attrs: Attribute[]) {
+      this._attributes = attrs;
+      this._attribute_map = mapByType(this._attributes);
+    }
+
+    get attribute_map(): {[key: string]: Attribute} {
+      return this._attribute_map || {};
+    }
 
     get issuer(): Issuer {
       return this.credential_type && this.credential_type.issuer;
@@ -133,19 +154,13 @@ export namespace Model {
     set issuer(val: Issuer) {
     }
     get haveAddresses() {
-      return this.addresses && this.addresses.length;
+      return this.topic.addresses && this.topic.addresses.length;
     }
-    get haveContacts() {
-      return this.contacts && this.contacts.length;
+    get haveAttributes() {
+      return this.attributes && this.attributes.length;
     }
     get haveNames() {
       return this.names && this.names.length;
-    }
-    get havePeople() {
-      return this.people && this.people.length;
-    }
-    get haveCategories() {
-      return this.categories && this.categories.length;
     }
   }
 
@@ -221,6 +236,10 @@ export namespace Model {
 
     static resourceName = 'issuer';
 
+    get pageTitle(): string {
+      return this.name;
+    }
+
     get logo_url(): string {
       if(this.has_logo) {
         return `${Issuer.resourceName}/${this.id}/logo`;
@@ -235,36 +254,17 @@ export namespace Model {
 
   export class Name extends BaseModel {
     id: number;
-    credential: Credential;
     text: string;
     type: string;
-    startDate: string;
-    endDate: string;
-
-    // extra API fields
-    // address: Address;
-    issuer: Issuer;
+    credential_id: number;
+    inactive: boolean;
 
     static resourceName = 'name';
 
+    // extra API fields
+    issuer: Issuer;
     static propertyMap = {
-      credential: 'Credential',
       issuer: 'Issuer',
-    };
-  }
-
-  export class Person extends BaseModel {
-    id: number;
-    credential: Credential;
-    fullName: string;
-    type: string;
-    startDate: string;
-    endDate: string;
-
-    static resourceName = 'person';
-
-    static propertyMap = {
-      credential: 'Credential',
     };
   }
 
@@ -274,17 +274,48 @@ export namespace Model {
     type: string;
 
     addresses: Address[];
+    _attributes: Attribute[];
+    _attribute_map: {[key: string]: Attribute};
     names: Name[];
-    contacts: Contact[];
-    people: Person[];
-    categories: Category[];
 
     static resourceName = 'topic';
 
-    static propertyMap = {
-      address: 'Address',
-      category: 'Category',
+    static listPropertyMap = {
+      addresses: 'Address',
+      attributes: 'Attribute',
+      names: 'Name',
     };
+
+    get attributes(): Attribute[] {
+      return this._attributes;
+    }
+    set attributes(attrs: Attribute[]) {
+      this._attributes = attrs;
+      this._attribute_map = mapByType(this._attributes);
+    }
+
+    get attribute_map(): {[key: string]: Attribute} {
+      return this._attribute_map || {};
+    }
+
+    get pageTitle(): string {
+      if(this.names && this.names.length) {
+        return this.names[0].text;
+      }
+    }
+
+    get preferredName(): Name {
+      let found = null;
+      if(this.names) {
+        for(let name of this.names) {
+          if(name.type === 'entity_name')
+            found = name;
+        }
+        if(! found)
+          found = this.names[0];
+      }
+      return found;
+    }
 
     get typeLabel(): string {
       if(this.type) return ('name.'+this.type).replace(/_/g, '-');
@@ -292,6 +323,9 @@ export namespace Model {
     }
 
     get link(): string[] {
+      // FIXME need to move link generation into general data service
+      if(this.type === 'registration')
+        return ['/topic/', this.source_id];
       return ['/topic/', this.type, this.source_id];
     }
 
@@ -321,15 +355,16 @@ export namespace Fetch {
   export class BaseResult<T> {
     public data: T;
     public meta: any;
+    protected _input: any;
 
     constructor(
-      protected _ctor: (any) => T,
-      protected _input?: any,
-      public error?: any,
-      public loading: boolean = false,
-      _meta: any = null) {
-        this.input = _input;
-        this.meta = _meta || {};
+        protected _ctor: (any) => T,
+        input?: any,
+        public error?: any,
+        public loading: boolean = false,
+        meta = null) {
+      this.input = input;
+      this.meta = meta || {};
     }
 
     get input(): any {
@@ -346,7 +381,7 @@ export namespace Fetch {
     }
 
     get loaded(): boolean {
-      return ! this.empty && ! this.loading;
+      return !! this.data;
     }
 
     get notFound(): boolean {
@@ -354,7 +389,7 @@ export namespace Fetch {
     }
   }
 
-  export class Pagination {
+  export class ListInfo {
     public pageNum: number = 1;
     public pageCount: number = 0;
     public resultCount: number = 0;
@@ -365,6 +400,7 @@ export namespace Fetch {
     public previous: string = null;
     public next: string = null;
     public params: {[key: string]: any};
+    public facets: any;
 
     get havePrevious(): boolean {
       return this.previous != null;
@@ -374,8 +410,8 @@ export namespace Fetch {
       return this.next != null;
     }
 
-    static fromResult(value: any): Pagination {
-      let ret = new Pagination();
+    static fromResult(value: any): ListInfo {
+      let ret = new ListInfo();
       if(value) {
         ret.pageNum = value.page || null;
         ret.firstIndex = value.first_index || null;
@@ -389,8 +425,11 @@ export namespace Fetch {
   }
 
   export class ListResult<T> extends BaseResult<T[]> {
-    public pagination: Pagination;
-    public facets: any;
+    public info: ListInfo;
+
+    get input(): any {
+      return this._input;
+    }
 
     set input(value: any) {
       this._input = value;
@@ -399,7 +438,7 @@ export namespace Fetch {
       }
       else if(value && 'results' in value && value['results'] instanceof Array) {
         this.data = this._ctor(value['results']);
-        this.pagination = Pagination.fromResult(value);
+        this.info = ListInfo.fromResult(value);
       }
       else {
         this.data = null;
@@ -417,12 +456,13 @@ export namespace Fetch {
   }
 
   export class RequestParams {
-    path: string;
-    resource: string;
-    recordId: string;
-    childResource: string;
-    childId: string;
-    extPath: string;
+    path?: string;
+    resource?: string;
+    recordId?: string;
+    childResource?: string;
+    childId?: string;
+    extPath?: string;
+    persist: boolean = false;
 
     static fromModel<M extends Model.BaseModel>(ctor: Model.ModelCtor<M>) {
       let req = new RequestParams();
@@ -500,9 +540,10 @@ export namespace Fetch {
     _sub: Subscription;
 
     constructor(
-        protected _rctor: ResultCtor<T, R>,
-        protected _map: (any) => T,
-        protected _req?: RequestParams) {
+      protected _rctor: ResultCtor<T, R>,
+      protected _map: (any) => T,
+      protected _req?: RequestParams
+    ) {
       if(! this._req) this._req = new RequestParams();
       this._result = new BehaviorSubject(this._makeResult());
     }
@@ -527,7 +568,7 @@ export namespace Fetch {
       }
     }
 
-    protected _makeResult(input?: any, error?: any, loading: boolean=false, meta=null) {
+    protected _makeResult(input?: any, error?: any, loading: boolean = false, meta=null) {
       return new this._rctor(this._map, input, error, loading, meta);
     }
 
@@ -551,24 +592,25 @@ export namespace Fetch {
       return this._req;
     }
 
-    loadData(data: any, meta=null) {
-      this.result = this._makeResult(data, null, false, meta);
+    loadData(input: any, meta = null) {
+      this.result = this._makeResult(input, null, false, meta);
     }
 
-    loadError(err: any, meta=null) {
+    loadError(err: any, meta = null) {
       this.result = this._makeResult(null, err, false, meta);
     }
 
-    loadFrom(obs: Observable<any>, meta=null) {
+    loadFrom(obs: Observable<any>, meta = null) {
       this._clearSub();
-      this.result = this._makeResult(null, null, true, meta);
+      let input = this._req.persist ? this.result.input : null;
+      this.result = this._makeResult(input, null, true, meta);
       this._sub = obs.subscribe(
         (result) => this.loadData(result, meta),
         (err) => this.loadError(err, meta)
       );
     }
 
-    loadNotFound(meta=null) {
+    loadNotFound(meta = null) {
       this.loadError({obj: {status: 404}});
     }
   }
@@ -588,8 +630,6 @@ export namespace Fetch {
   }
 
   export class ListLoader<T> extends BaseLoader<T[], ListResult<T>> {
-    public pagination;
-
     constructor(
         protected _mapEntry: (any) => T,
         req?: RequestParams) {
@@ -612,17 +652,215 @@ export namespace Fetch {
   }
 
   export class ModelLoader<M extends Model.BaseModel> extends DataLoader<M> {
-    constructor(ctor: Model.ModelCtor<M>, req?: RequestParams) {
+    constructor(ctor: Model.ModelCtor<M>, req?: RequestParams | { [key: string]: any }) {
       let creq = RequestParams.fromModel(ctor).extend(req);
       super((data) => new ctor(data), creq);
     }
   }
 
   export class ModelListLoader<M extends Model.BaseModel> extends ListLoader<M> {
-    constructor(ctor: Model.ModelCtor<M>, req?: RequestParams) {
+    constructor(ctor: Model.ModelCtor<M>, req?: RequestParams | { [key: string]: any }) {
       let creq = RequestParams.fromModel(ctor).extend(req);
       super((data) => new ctor(data), creq);
     }
   }
 }
 // end Fetch
+
+
+export namespace Filter {
+
+  export interface Option {
+    label: string;
+    value: string;
+    active?: boolean;
+  }
+
+  export interface FieldSpec {
+    name: string;
+    label?: string;
+    alias?: string;
+    options?: Option[];
+    hidden?: boolean;
+    defval?: string;
+    value?: string;
+    blank?: boolean;
+  }
+
+  export class Field implements FieldSpec {
+    public name = '';
+    public alias = null;
+    public label = '';
+    public options;
+    public hidden = false;
+    public defval = '';
+    public blank = false;
+    _value: string = null;
+
+    constructor(init?: FieldSpec) {
+      if(init) {
+        Object.assign(this, init);
+        if(init.options)
+          this.options = init.options.map(o => Object.assign({}, o));
+      }
+    }
+
+    clone() {
+      return new Field(this);
+    }
+
+    get value() {
+      return this._value;
+    }
+
+    set value(val: string) {
+      if(val === undefined || val === null) val = this.defval;
+      this._value = val;
+      this.setActive();
+    }
+
+    setActive() {
+      let val = this.value;
+      if(this.options) {
+        for(let o of this.options) {
+          o.active = (o.value === val);
+        }
+      }
+    }
+  }
+
+  interface StrDict {[key: string]: string}
+
+  export class FieldSet {
+    _result: BehaviorSubject<Field[]>;
+    _fields: Field[] = [];
+    _defaults: StrDict = {};
+    _values: StrDict = {};
+
+    constructor(
+      fields: FieldSpec[]
+    ) {
+      let fs = [];
+      if(fields) {
+        for(let opt of fields)
+          fs.push(new Field(opt));
+      }
+      this._fields = fs;
+      this._result = new BehaviorSubject(this._next());
+    }
+
+    loadQuery(params: StrDict) {
+      let upd = {};
+      for(let opt of this._fields) {
+        let k = opt.alias || opt.name;
+        if(k in params)
+          upd[opt.name] = params[k];
+      }
+      this.update(upd);
+    }
+
+    get stream(): Observable<Field[]> {
+      return this._result.asObservable();
+    }
+
+    get streamVisible(): Observable<Field[]> {
+      return this.stream.map(fs => fs.filter(f => ! f.hidden));
+    }
+
+    get result(): Field[] {
+      return this._result.value;
+    }
+
+    get queryParams(): StrDict {
+      let fs = this.result;
+      let ret = {};
+      for(let opt of fs) {
+        if(opt.value !== null)
+          ret[opt.alias || opt.name] = opt.value;
+      }
+      return ret;
+    }
+
+    complete() {
+      if(this._result) {
+        this._result.complete();
+        this._result = null;
+      }
+    }
+
+    reset() {
+      this.values = {};
+    }
+
+    getFieldValue(key: string): string {
+      return this._values[key];
+    }
+
+    setFieldValue(key: string, value: string|number) {
+      let upd = {};
+      upd[key] = value;
+      this.update(upd);
+    }
+
+    update(vals?: StrDict) {
+      let v = {... this._values};
+      if(vals)
+        Object.assign(v, vals);
+      this.values = v;
+    }
+
+    _next() {
+      let vs = this._values;
+      let fs = [];
+      for(let f of this._fields) {
+        let f2 = f.clone();
+        f2.value = vs[f2.name];
+        fs.push(f2);
+      }
+      return fs;
+    }
+
+    _update() {
+      if(this._result)
+        this._result.next(this._next());
+    }
+
+    get defaults() {
+      return this._defaults;
+    }
+
+    set defaults(vals: StrDict) {
+      this._defaults = vals || {};
+      this.update();
+    }
+
+    get values() {
+      return {... this._values};
+    }
+
+    set values(vals: StrDict) {
+      let v = {};
+      for(let f of this._fields) {
+        let defval = f.defval;
+        if(f.name in this._defaults)
+          defval = this._defaults[f.name];
+        if(vals && f.name in vals && vals[f.name] !== null) {
+          let input = vals[f.name];
+          if(typeof input === 'string' || typeof input === 'number') {
+            input = ('' + input).trim();
+          }
+          if(input === '' && defval !== '' && ! f.blank) {
+            input = defval;
+          }
+          v[f.name] = input;
+        }
+        else {
+          v[f.name] = defval;
+        }
+      }
+      this._values = v;
+      this._update();
+    }
+  }
+}
+// end Filter

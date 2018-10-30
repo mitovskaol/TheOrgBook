@@ -14,7 +14,8 @@
         <a class="body-link issuer-link" [routerLink]="['/issuer', cred.issuer.id] | localize">{{cred.issuer.name}}</a>
       </p>
       <div class="cred-status">
-        <div class="badge" *ngIf="cred.revoked" translate>cred.expired</div>
+        <div class="label label-warning" *ngIf="cred.inactive" translate>cred.inactive</div>
+        <div class="label label-danger" *ngIf="cred.revoked" translate>cred.expired</div>
       </div>
     </div>
   </div>
@@ -35,13 +36,14 @@
       </div>
     </div>
     <div class="col-sm-4">
-      <div class="badge" *ngIf="cred.revoked" translate>cred.expired</div>
+      <div class="label label-warning" *ngIf="cred.inactive" translate>cred.inactive</div>
+      <div class="label label-danger" *ngIf="cred.revoked" translate>cred.expired</div>
     </div>
   </div>
 </div>
 <div class="creds-list creds-search" *ngIf="format==='search'">
   <div class="row cred-row" *ngFor="let cred of records">
-    <div class="col-sm-7">
+    <div class="col-md-7">
       <label>{{cred.topic.typeLabel | translate}}:</label>
       <a [routerLink]="cred.topic.link | localize"
         class="body-link cred-link name">{{cred.names[0].text}}</a>
@@ -60,8 +62,9 @@
         <span class="claim-info date">{{cred.effective_date | dateFormat: 'effectiveDate'}}</span>
       </small>
     </div>
-    <div class="col-sm-5">
-      <div class="badge" *ngIf="cred.revoked" translate>cred.expired</div>
+    <div class="col-md-5">
+      <div class="label label-warning" *ngIf="cred.inactive" translate>cred.inactive</div>
+      <div class="label label-danger" *ngIf="cred.revoked" translate>cred.expired</div>
 
       <small *ngIf="cred.addresses && cred.addresses.length > 0">
         <!-- TODO: Add notion of 'type' to address model? -->

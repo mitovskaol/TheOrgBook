@@ -18,7 +18,31 @@ services:
       - "${WEB_HTTP_PORT}:8080"
     depends_on:
       - tob-api
-    # command: npm start
+
+  #
+  # tob-web-dev
+  # Run tob-web in development mode with auto-reload and inspector support
+  #
+  tob-web-dev:
+    image: angular-dev
+    environment:
+      - API_URL=${API_URL}
+      - DEV_MODE=false
+      - NODE_ENV=development
+      - NPM_CONFIG_LOGLEVEL=notice
+      - NPM_RUN=dev
+      - TOB_THEME=${TOB_THEME}
+      - WEB_BASE_HREF=${WEB_BASE_HREF}
+      - WEB_DEPLOY_URL=${WEB_DEPLOY_URL}
+    networks:
+      - tob
+    ports:
+      - "${WEB_HTTP_PORT}:8080"
+      - 5858:5858
+    volumes:
+      - "../tob-web/src:/opt/app-root/src/src"
+    depends_on:
+      - tob-api
 
   # 
   # tob-api
@@ -51,11 +75,15 @@ services:
       - POSTGRESQL_WALLET_USER=${POSTGRESQL_USER}
       - POSTGRESQL_WALLET_PASSWORD=${POSTGRESQL_PASSWORD}
       - POSTGRESQL_WALLET_ADMIN_PASSWORD=${POSTGRESQL_ADMIN_PASSWORD}
+      - WALLET_ENCRYPTION_KEY=${WALLET_ENCRYPTION_KEY}
+      - INDY_WALLET_SEED=${INDY_WALLET_SEED}
+      - HOLDER_WALLET_DID=${HOLDER_WALLET_DID}
       - DEBUG=${DEBUG}
       - SQL_DEBUG=${SQL_DEBUG}
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DJANGO_DEBUG=${DJANGO_DEBUG}
       - DJANGO_LOG_LEVEL=${DJANGO_LOG_LEVEL}
+      - OPTIMIZE_TABLE_ROW_COUNTS=${OPTIMIZE_TABLE_ROW_COUNTS}
       - SOLR_SERVICE_NAME=${SOLR_SERVICE_NAME}
       - SOLR_CORE_NAME=${SOLR_CORE_NAME}
       - SKIP_INDEXING_ON_STARTUP=${SKIP_INDEXING_ON_STARTUP}
@@ -63,18 +91,21 @@ services:
       - TOB_DB_SERVICE_PORT=5432
       - TOB_SOLR_SERVICE_HOST=${SOLR_SERVICE_NAME}
       - TOB_SOLR_SERVICE_PORT=8983
-      - INDY_WALLET_SEED=${INDY_WALLET_SEED}
+      - INDY_DISABLED=${INDY_DISABLED}
       - LEDGER_URL=${LEDGER_URL}
-      - INDY_WALLET_TYPE=${INDY_WALLET_TYPE}
-      - INDY_WALLET_URL=${INDY_WALLET_URL}
+      - GENESIS_URL=${GENESIS_URL}
+      - LEDGER_PROTOCOL_VERSION=${LEDGER_PROTOCOL_VERSION}
+      - AUTO_REGISTER_DID=${AUTO_REGISTER_DID:-1}
       - STI_SCRIPTS_PATH=${STI_SCRIPTS_PATH}
       - WEB_CONCURRENCY=${WEB_CONCURRENCY:-1}
       - RUST_LOG=${RUST_LOG}
       - RUST_BACKTRACE=${RUST_BACKTRACE}
       - TOB_THEME=${TOB_THEME}
       - ENABLE_REALTIME_INDEXING=${ENABLE_REALTIME_INDEXING}
+      - APPLICATION_URL=${APPLICATION_URL}
     volumes:
       - ../tob-api/api:/home/indy/api
+      - ../tob-api/tob_api:/home/indy/tob_api
       - ../tob-api/api_v2:/home/indy/api_v2
       - tob-wallet:/home/indy/.indy_client/wallet
     networks:
@@ -143,7 +174,7 @@ services:
   # tob-db
   # 
   tob-db:
-    image: registry.access.redhat.com/rhscl/postgresql-95-rhel7:9.5
+    image: postgresql
     environment:
       - POSTGRESQL_USER=${POSTGRESQL_USER}
       - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}
@@ -159,7 +190,7 @@ services:
   # wallet-db
   # 
   wallet-db:
-    image: registry.access.redhat.com/rhscl/postgresql-95-rhel7:9.5
+    image: postgresql
     environment:
       - POSTGRESQL_USER=${POSTGRESQL_USER}
       - POSTGRESQL_PASSWORD=${POSTGRESQL_PASSWORD}

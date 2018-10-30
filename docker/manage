@@ -60,7 +60,11 @@ usage() {
               $0 start tob-web
               $0 start tob-web API_URL=http://docker.for.win.localhost:56325/api/v1
               $0 start tob-api
-    
+
+      web-dev - Builds and runs a live development version of tob-web, along with
+                the required supporting components. Once started, the website is
+                automatically compiled and updated in response to file modifications.
+
       stop - Stops the services.  This is a non-destructive process.  The containers
              are not deleted so they will be reused the next time you run start.
     
@@ -87,29 +91,68 @@ build-web() {
   # tob-web
   #
   # The nginx-runtime image is used for the final runtime image.
-  # The angular-app image is used to build the artifacts for the angular distribution.
+  # The nodejs-build image is used to build the artifacts for the angular distribution.
   # The angular-on-nginx image is copy of the nginx-runtime image complete with a copy of the build artifacts.
   #
   echo -e "\nBuilding nginx-runtime image ..."
-  docker build \
+  docker build -q \
     -t 'nginx-runtime' \
     -f '../tob-web/openshift/templates/nginx-runtime/Dockerfile' '../tob-web/openshift/templates/nginx-runtime/'
 
-  echo -e "\nBuilding angular-app image ..."
+  # This image only exists to pre-create the npm cache directory
+  # so it can be properly used as a volume, it doesn't apply to openshift
+  echo -e "\nBuilding nodejs-build image ..."
+  docker build -q \
+    -t 'nodejs-build' \
+    -f '../tob-web/openshift/templates/nodejs-build/Dockerfile' '../tob-web/openshift/templates/nodejs-build/'
+
+  if [ -t 0 ]; then
+    # color npm output in interactive terminal
+	NPM_COLOR="always"
+  else
+    NPM_COLOR="true"
+  fi
+
+  echo -e "\nBuilding angular-on-nginx image ..."
   ${S2I_EXE} build \
+    -e "NPM_CONFIG_COLOR=${NPM_COLOR}" \
+    -e "NPM_CONFIG_LOGLEVEL=timing" \
     -e "HTTP_PROXY=${HTTP_PROXY}" \
     -e "HTTPS_PROXY=${HTTPS_PROXY}" \
     -e "NG_BASE_HREF=${WEB_BASE_HREF}" \
     -e "NG_DEPLOY_URL=${WEB_DEPLOY_URL}" \
     -e "TOB_THEME=${TOB_THEME}" \
+    -v "${COMPOSE_PROJECT_NAME}_tob-npm-cache:/opt/app-root/src/.npm" \
+    --runtime-image nginx-runtime \
+    -a /opt/app-root/src/dist:app \
     '../tob-web' \
-    'centos/nodejs-6-centos7:6' \
-    'angular-app'
+    'nodejs-build' \
+    'angular-on-nginx'
+}
 
-  echo -e "\nBuilding angular-on-nginx image ..."
-  docker build \
-    -t 'angular-on-nginx' \
-    -f '../tob-web/openshift/templates/angular-on-nginx/Dockerfile' '../tob-web/openshift/templates/angular-on-nginx/'
+build-web-dev() {
+  #
+  # tob-web-dev
+  # Alternative version of tob-web for live development
+  #
+  echo -e "\nBuilding nodejs-build image ..."
+  docker build -q \
+    -t 'nodejs-build' \
+    -f '../tob-web/openshift/templates/nodejs-build/Dockerfile' '../tob-web/openshift/templates/nodejs-build/'
+
+  # NB: We build with DEV_MODE=true but run with DEV_MODE=false
+  echo -e "\nBuilding angular-dev image ..."
+  ${S2I_EXE} build \
+    -e "DEV_MODE=true" \
+    -e "HTTP_PROXY=${HTTP_PROXY}" \
+    -e "HTTPS_PROXY=${HTTPS_PROXY}" \
+    -e "NG_BASE_HREF=${WEB_BASE_HREF}" \
+    -e "NG_DEPLOY_URL=${WEB_DEPLOY_URL}" \
+    -e "TOB_THEME=${TOB_THEME}" \
+    -v "${COMPOSE_PROJECT_NAME}_tob-npm-cache:/opt/app-root/src/.npm" \
+    '../tob-web' \
+    'nodejs-build' \
+    'angular-dev'
 }
 
 build-solr() {
@@ -134,8 +177,11 @@ build-db() {
   #
   # tob-db
   #
-  # Nothing to build here ...
-  echo
+  echo -e "\nBuilding postgresql image ..."
+  ${S2I_EXE} build \
+    '../tob-db/config' \
+    'registry.access.redhat.com/rhscl/postgresql-95-rhel7:9.5' \
+    'postgresql'
 }
 
 build-schema-spy() {
@@ -152,12 +198,15 @@ build-api() {
   #
   # tob-api
   #
-  echo -e "\nBuilding django image ..."
+  BASE_IMAGE="bcgovimages/von-image:py36-1.6-ew-9-s2i"
+  echo -e "\nBuilding django image from ${BASE_IMAGE}..."
   ${S2I_EXE} build \
     -e "HTTP_PROXY=${HTTP_PROXY}" \
     -e "HTTPS_PROXY=${HTTPS_PROXY}" \
+    -e "PIP_NO_CACHE_DIR=" \
+    -v "${COMPOSE_PROJECT_NAME}_tob-pip-cache:/home/indy/.cache/pip" \
     '../tob-api' \
-    'bcgovimages/von-image:py36-1.6-ew-s2i' \
+    "$BASE_IMAGE" \
     'django'
 }
 
@@ -174,7 +223,7 @@ configureEnvironment() {
   if [ -f .env ]; then
     while read line; do
       if [[ ! "$line" =~ ^\# ]] && [[ "$line" =~ .*= ]]; then
-        export $line
+        export ${line//[$'\r\n']}
       fi
     done <.env
   fi
@@ -187,14 +236,11 @@ configureEnvironment() {
     esac
   done
 
+  seed=${INDY_WALLET_SEED:-$seed}
+
   if [ "$COMMAND" == "start" ] || [ "$COMMAND" == "registerdids" ]; then
     if [ -z "$seed" ]; then
       echo "You must provide a seed parameter. For example: seed=my_seed_000000000000000000000000."
-      exit 1
-    fi
-
-    if [ ${#seed} -ne 32 ]; then
-      echo "The seed parameter must be 32 characters long exactly."
       exit 1
     fi
   fi
@@ -214,6 +260,7 @@ configureEnvironment() {
 
   # wallet-db
   export WALLET_TYPE="postgres"
+  export WALLET_ENCRYPTION_KEY="key"
   export POSTGRESQL_WALLET_HOST="wallet-db"
   export POSTGRESQL_WALLET_PORT="5432"
   export POSTGRESQL_ADMIN_USER="postgres"
@@ -241,12 +288,17 @@ configureEnvironment() {
   export DJANGO_SECRET_KEY=wpn1GZrouOryH2FshRrpVHcEhMfMLtmTWMC2K5Vhx8MAi74H5y
   export DJANGO_DEBUG=True
   export DJANGO_LOG_LEVEL=${DJANGO_LOG_LEVEL-INFO}
+  export OPTIMIZE_TABLE_ROW_COUNTS=${OPTIMIZE_TABLE_ROW_COUNTS-}
+  export INDY_DISABLED=${INDY_DISABLED-}
   export SOLR_SERVICE_NAME="tob-solr"
   export SOLR_CORE_NAME=${CORE_NAME}
   export SKIP_INDEXING_ON_STARTUP=${SKIP_INDEXING_ON_STARTUP-}
+  export GENESIS_URL=${GENESIS_URL-}
   export LEDGER_URL=${LEDGER_URL-http://$DOCKERHOST:9000}
+  export LEDGER_PROTOCOL_VERSION=${LEDGER_PROTOCOL_VERSION-}
   export SQL_DEBUG=${SQL_DEBUG:-}
   export WEB_CONCURRENCY=${WEB_CONCURRENCY:-5}
+  export APPLICATION_URL=${APPLICATION_URL-http://localhost:8080}
 
   # tob-web
   export TOB_THEME=${TOB_THEME:-bcgov}
@@ -298,6 +350,9 @@ deleteVolumes() {
   else
     echo "No project volumes exist."
   fi
+  
+  echo "Removing build cache ..."
+  rm -Rf ../tob-web/.cache
 }
 
 registerDids() {
@@ -359,13 +414,19 @@ toLower() {
 
 pushd ${SCRIPT_HOME} >/dev/null
 COMMAND=$(toLower ${1})
-shift
+shift || COMMAND=usage
 
 case "${COMMAND}" in
 start)
   _startupParams=$(getStartupParams $@)
   configureEnvironment $@
   docker-compose up ${_startupParams}
+  ;;
+web-dev)
+  _startupParams=$(getStartupParams $@)
+  configureEnvironment $@
+  [ -z "$SKIP_BUILD" ] && build-web-dev
+  docker-compose run --rm --service-ports tob-web-dev
   ;;
 stop)
   configureEnvironment
@@ -391,6 +452,9 @@ build)
     ;;
   tob-solr)
     build-solr
+    ;;
+  tob-db)
+    build-db
     ;;
   *)
     buildImages
