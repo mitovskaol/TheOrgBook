@@ -5,6 +5,8 @@ import { Fetch, Filter, Model } from '../data-types';
 import { CredListComponent } from '../cred/list.component';
 import { SearchInputComponent } from './input.component';
 import { Subscription } from 'rxjs/Subscription';
+import { TranslateService } from '@ngx-translate/core';
+
 
 const FilterSpec = [
   {
@@ -18,45 +20,43 @@ const FilterSpec = [
     hidden: true
   },
   {
+    name: "issuer_id",
+    label: "cred.issuer"
+  },
+  {
+    name: "credential_type_id",
+    label: "cred.cred-type"
+  },
+  {
+    name: "category:entity_type",
+    label: "attribute.entity_type"
+  },
+  {
     name: "inactive",
     label: "attribute.entity_status",
     options: [
       {
-        label: "general.period-current",
-        value: "false"
-      },
-      {
-        label: "general.period-historical",
-        value: "true"
-      },
-      {
-        label: "general.status-any",
-        value: ""
-      }
-    ],
-    defval: "false",
-    blank: true
-  },
-  {
-    name: "revoked",
-    label: "cred.status",
-    options: [
-      {
-        label: "general.status-nonrevoked",
-        value: "false"
-      },
-      {
-        label: "general.status-revoked",
-        value: "true"
-      },
-      {
-        label: "general.status-any",
+        tlabel: "general.show-inactive",
         value: ""
       }
     ],
     defval: "false",
     blank: true
   }
+  /*
+  {
+    name: "revoked",
+    label: "cred.status",
+    options: [
+      {
+        tlabel: "general.show-revoked",
+        value: ""
+      }
+    ],
+    defval: "false",
+    blank: true
+  }
+  */
 ];
 
 @Component({
@@ -70,7 +70,7 @@ export class SearchComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('credList') _nameList: CredListComponent;
   protected _filters = new Filter.FieldSet(FilterSpec);
   protected _filterType: string;
-  protected _loader = new Fetch.ModelListLoader(Model.CredentialSearchResult, {persist: true});
+  protected _loader = new Fetch.ModelListLoader(Model.CredentialFacetSearchResult, {persist: true});
   protected _querySub: Subscription;
   protected _typeSub: Subscription;
   protected _inited = false;
@@ -79,6 +79,7 @@ export class SearchComponent implements OnInit, OnDestroy, AfterViewInit {
     private _dataService: GeneralDataService,
     private _route: ActivatedRoute,
     private _router: Router,
+    private _translate: TranslateService,
   ) {}
 
   ngOnInit() {
@@ -95,6 +96,7 @@ export class SearchComponent implements OnInit, OnDestroy, AfterViewInit {
     this._typeSub = this._route.params.subscribe(params => {
       this.filterType = params['filterType'];
     });
+    this._loader.ready.subscribe(this.handleFacets.bind(this));
   }
 
   ngAfterViewInit() {
@@ -139,6 +141,48 @@ export class SearchComponent implements OnInit, OnDestroy, AfterViewInit {
   get pageNum(): number {
     let val = this._filters.getFieldValue('page');
     return parseInt(val || '1', 10);
+  }
+
+  public handleFacets(data) {
+    let fields = data.info.facets.fields;
+    let options = {
+      credential_type_id: [],
+      issuer_id: [],
+      'category:entity_type': [],
+    };
+    if(fields) {
+      for(let optname in fields) {
+        for(let optitem of fields[optname]) {
+          let optidx = optname;
+          let optval: Filter.Option = {label: optitem.text, value: optitem.value, count: optitem.count};
+          if(optname == 'category') {
+            if(! optitem.count)
+              // skip empty category values
+              continue;
+            let optparts = optitem.value.split('::', 2);
+            if(optparts.length == 2) {
+              optidx = optname + ':' + optparts[0];
+              let lblkey = `category.${optparts[0]}.${optparts[1]}`;
+              let label = this._translate.instant(lblkey);
+              if(label === lblkey || label === `??${lblkey}??`)
+                label = optparts[1];
+              optval = {
+                label,
+                value: optparts[1],
+                count: optitem.count,
+              };
+            }
+          }
+          if(optidx in options) {
+            options[optidx].push(optval);
+          }
+        }
+      }
+    }
+    for(let name in options) {
+      options[name].sort((a,b) => a.label.localeCompare(b.label));
+      this._filters.setOptions(name, options[name]);
+    }
   }
 
   public handleNav(nav: string) {

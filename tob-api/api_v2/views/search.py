@@ -1,10 +1,10 @@
 import logging
 
 from rest_framework import permissions
+from rest_framework.decorators import list_route
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from drf_haystack.filters import (
-    HaystackFacetFilter,
     HaystackOrderingFilter,
 )
 from drf_haystack.mixins import FacetMixin
@@ -18,6 +18,8 @@ from api_v2.search.filters import (
     AutocompleteFilter,
     CategoryFilter,
     CredNameFilter,
+    CustomFacetFilter,
+    ExactFilter,
     StatusFilter,
 )
 from api_v2.serializers.search import (
@@ -142,6 +144,24 @@ class CredentialSearchView(HaystackViewSet, FacetMixin):
             description="Filter by credential category. The category name and value should be joined by '::'",
             type=openapi.TYPE_STRING,
         ),
+        openapi.Parameter(
+            "credential_type_id",
+            openapi.IN_QUERY,
+            description="Filter by Credential Type ID",
+            type=openapi.TYPE_STRING,
+        ),
+        openapi.Parameter(
+            "issuer_id",
+            openapi.IN_QUERY,
+            description="Filter by Issuer ID",
+            type=openapi.TYPE_STRING,
+        ),
+        openapi.Parameter(
+            "topic_id",
+            openapi.IN_QUERY,
+            description="Filter by Topic ID",
+            type=openapi.TYPE_STRING,
+        ),
     ]
     list = swagger_auto_schema(
         manual_parameters=_swagger_params,
@@ -157,15 +177,15 @@ class CredentialSearchView(HaystackViewSet, FacetMixin):
     filter_backends = [
         CredNameFilter,
         CategoryFilter,
+        ExactFilter,
         StatusFilter,
         HaystackOrderingFilter,
     ]
     facet_filter_backends = [
         CredNameFilter,
-        CategoryFilter,
+        ExactFilter,
         StatusFilter,
-        HaystackOrderingFilter,
-        HaystackFacetFilter,
+        CustomFacetFilter,
     ]
     facet_serializer_class = CredentialFacetSerializer
     facet_objects_serializer_class = CredentialSearchSerializer
@@ -173,6 +193,28 @@ class CredentialSearchView(HaystackViewSet, FacetMixin):
     ordering = ('-score')
 
     # FacetMixin provides /facets
+    @list_route(methods=["get"], url_path="facets")
+    def facets(self, request):
+        """
+        We want facet_counts from the less-restricted queryset
+        """
+        queryset = self.get_queryset()
+        facet_queryset = self.filter_facet_queryset(queryset)
+        result_queryset = self.filter_queryset(queryset)
+
+        #for facet in request.query_params.getlist(self.facet_query_params_text):
+            #if ":" not in facet:
+            #    continue
+            #field, value = facet.split(":", 1)
+            #if value:
+            #    queryset = queryset.narrow('%s:"%s"' % (field, queryset.query.clean(value)))
+        for key in ('category', 'credential_type_id', 'issuer_id'):
+            for value in request.query_params.getlist(key):
+                if value:
+                    facet_queryset = facet_queryset.narrow('{}:"{}"'.format(key, queryset.query.clean(value)))
+
+        serializer = self.get_facet_serializer(facet_queryset.facet_counts(), objects=result_queryset, many=False)
+        return Response(serializer.data)
 
 
 class TopicSearchQuerySet(RelatedSearchQuerySet):

@@ -1,3 +1,4 @@
 {
-  "DISPLAY_TIMEZONE": "GMT"
+  "DISPLAY_TIMEZONE": "EST",
+  "AUTO_VERIFY_CRED": "false"
 }

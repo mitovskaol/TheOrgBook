@@ -113,6 +113,7 @@ export namespace Model {
     credential_set: CredentialSet;
     effective_date: string;
     inactive: boolean;
+    latest: boolean;
     revoked: boolean;
     revoked_date: string;
 
@@ -175,6 +176,10 @@ export namespace Model {
 
   export class CredentialSearchResult extends Credential {
     static resourceName = 'search/credential/topic';
+  }
+
+  export class CredentialFacetSearchResult extends Credential {
+    static resourceName = 'search/credential/topic/facets';
   }
 
   export class CredentialVerifyResult extends BaseModel {
@@ -437,8 +442,9 @@ export namespace Fetch {
       return this.next != null;
     }
 
-    static fromResult(value: any): ListInfo {
+    static fromResult(value: any, facets?: any): ListInfo {
       let ret = new ListInfo();
+      ret.facets = facets;
       if(value) {
         ret.pageNum = value.page || null;
         ret.firstIndex = value.first_index || null;
@@ -466,6 +472,10 @@ export namespace Fetch {
       else if(value && 'results' in value && value['results'] instanceof Array) {
         this.data = this._ctor(value['results']);
         this.info = ListInfo.fromResult(value);
+      }
+      else if(value && 'objects' in value) {
+        this.data = this._ctor(value['objects']['results']);
+        this.info = ListInfo.fromResult(value['objects'], value['facets']);
       }
       else {
         this.data = null;
@@ -698,9 +708,11 @@ export namespace Fetch {
 export namespace Filter {
 
   export interface Option {
-    label: string;
+    label?: string;
+    tlabel?: string;
     value: string;
     active?: boolean;
+    count?: number;
   }
 
   export interface FieldSpec {
@@ -715,25 +727,37 @@ export namespace Filter {
   }
 
   export class Field implements FieldSpec {
+    public id = '';
     public name = '';
     public alias = null;
     public label = '';
-    public options;
     public hidden = false;
     public defval = '';
     public blank = false;
+    _options: any[];
     _value: string = null;
 
     constructor(init?: FieldSpec) {
       if(init) {
         Object.assign(this, init);
-        if(init.options)
-          this.options = init.options.map(o => Object.assign({}, o));
+        this.options = init.options;
       }
     }
 
     clone() {
       return new Field(this);
+    }
+
+    get options() {
+      return this._options;
+    }
+
+    set options(vals) {
+      this._options = vals ? vals.map(o => Object.assign({}, o)) : [];
+      for(let o of this._options) {
+        if(! o.id) o.id = this.name + '_' + (o.value || 'blank');
+      }
+      this.setActive();
     }
 
     get value() {
@@ -748,8 +772,8 @@ export namespace Filter {
 
     setActive() {
       let val = this.value;
-      if(this.options) {
-        for(let o of this.options) {
+      if(this._options) {
+        for(let o of this._options) {
           o.active = (o.value === val);
         }
       }
@@ -802,8 +826,9 @@ export namespace Filter {
       let fs = this.result;
       let ret = {};
       for(let opt of fs) {
-        if(opt.value !== null)
+        if(opt.value !== null) {
           ret[opt.alias || opt.name] = opt.value;
+        }
       }
       return ret;
     }
@@ -827,6 +852,16 @@ export namespace Filter {
       let upd = {};
       upd[key] = value;
       this.update(upd);
+    }
+
+    setOptions(key: string, value: any) {
+      for(let f of this._fields) {
+        if(f.name === key) {
+          f.options = value;
+          this.update();
+          break;
+        }
+      }
     }
 
     update(vals?: StrDict) {

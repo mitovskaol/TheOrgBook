@@ -22,16 +22,18 @@ class CredentialIndex(TxnAwareSearchIndex, indexes.Indexable):
     location = indexes.MultiValueField()
     category = indexes.MultiValueField()
     topic_id = indexes.IntegerField(model_attr="topic_id")
-    topic_type = indexes.CharField(faceted=True, model_attr="topic__type")
+    topic_type = indexes.CharField(model_attr="topic__type")
     source_id = indexes.CharField(model_attr="topic__source_id")
     inactive = indexes.BooleanField(model_attr="inactive")
     revoked = indexes.BooleanField(model_attr="revoked")
     latest = indexes.BooleanField(model_attr="latest")
-    effective_date = indexes.DateTimeField(faceted=True, model_attr="effective_date")
+    effective_date = indexes.DateTimeField(model_attr="effective_date")
     revoked_date = indexes.DateTimeField(model_attr="revoked_date", null=True)
     credential_set_id = indexes.IntegerField(model_attr="credential_set_id", null=True)
-    credential_type_id = indexes.IntegerField(faceted=True, model_attr="credential_type_id")
+    credential_type_id = indexes.IntegerField(model_attr="credential_type_id")
     issuer_id = indexes.IntegerField(model_attr="credential_type__issuer_id")
+    schema_name = indexes.CharField(model_attr="credential_type__schema__name")
+    schema_version = indexes.CharField(model_attr="credential_type__schema__version")
     wallet_id = indexes.CharField(model_attr="wallet_id")
 
     @staticmethod
@@ -73,6 +75,7 @@ class CredentialIndex(TxnAwareSearchIndex, indexes.Indexable):
         select = (
           "credential_set",
           "credential_type",
+          "credential_type__schema",
           "topic",
         )
         queryset = super(CredentialIndex, self).index_queryset(using)\
@@ -83,7 +86,6 @@ class CredentialIndex(TxnAwareSearchIndex, indexes.Indexable):
     def read_queryset(self, using=None):
         select = (
             "credential_type__issuer",
-            "credential_type__schema",
         )
         queryset = self.index_queryset(using) \
             .select_related(*select)

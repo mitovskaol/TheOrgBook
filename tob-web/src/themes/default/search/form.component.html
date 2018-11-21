@@ -1,6 +1,6 @@
 <section id="search" class="page-min-height" *ngIf="(result$ | async) as result">
   <div class="row">
-    <div class="col-sm-9 offset-sm-3">
+    <div class="col-sm-12 col-md-10 offset-md-1 col-lg-8 offset-lg-2">
       <h2 class="search-title" translate>search.title</h2>
 
       <div class="search-head">
@@ -20,18 +20,14 @@
   <div class="row">
     <div class="col-sm-12">
 
-      <div class="row results" *ngIf="inited">
-        <div class="col-sm-3 facets">
-          <search-filters #searchFilters [filters]="filters"></search-filters>
-        </div>
-
-        <div class="col-sm-9 rows">
+      <div class="row results mt-4 mt-md-5" *ngIf="inited">
+        <div class="col-md-8 col-lg-9 rows">
           <error-message [error]="result.error" [title]="'search.results-error' | translate"></error-message>
           <div class="alert alert-info" *ngIf="blankQuery && !result.data" translate>
             search.prompt
           </div>
           <ng-container *ngIf="result.data as creds">
-            <label class="control-label" translate>search.results-title</label>
+            <label class="control-label d-none" translate>search.results-title</label>
             <ng-container *ngIf="creds.length">
               <search-nav (nav)="handleNav($event)" [info]="result.info" [loading]="result.loading" show-status="true"></search-nav>
               <cred-list [records]="creds" format="search"></cred-list>
@@ -41,6 +37,10 @@
               search.no-results
             </div>
           </ng-container>
+        </div>
+
+        <div class="col-md-4 col-lg-3 facets">
+          <search-filters #searchFilters [filters]="filters"></search-filters>
         </div>
       </div>
     </div>
