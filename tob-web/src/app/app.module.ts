@@ -1,30 +1,28 @@
 import { BrowserModule } from '@angular/platform-browser';
 import { Location } from '@angular/common';
-import { NgModule, APP_INITIALIZER } from '@angular/core';
-import { Routes } from '@angular/router';
-import { FormsModule } from '@angular/forms';
 import { HttpClientModule } from '@angular/common/http';
-import { AppRoutingModule, routes } from './app-routing.module';
+import { NgModule, APP_INITIALIZER } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Routes } from '@angular/router';
+
+import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import {
   TranslateModule, TranslateLoader, TranslateService,
   MissingTranslationHandler, MissingTranslationHandlerParams
   } from '@ngx-translate/core';
-import { LocalizeParser, LocalizeRouterModule, LocalizeRouterSettings, ALWAYS_SET_PREFIX } from 'localize-router';
+import {
+  LocalizeParser, LocalizeRouterModule, LocalizeRouterSettings, ALWAYS_SET_PREFIX
+  } from 'localize-router';
 import { ILocalizeRouterParserConfig } from 'localize-router-http-loader';
 import { Observable } from 'rxjs';
 
-import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
-
+import { AppRoutingModule, ROUTES } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { AppConfigService } from './app-config.service';
 import { AppHeaderComponent } from './app-header/app-header.component';
 import { AppFooterComponent } from './app-footer/app-footer.component';
-import { BreadcrumbComponent } from './breadcrumb/breadcrumb.component';
-import { GeneralDataService } from 'app/general-data.service';
-import { AdminModule } from './admin/admin.module';
-import { PageScrollComponent } from './util/pagescroll.component';
-import { SearchBoxDirective } from './search-box/search-box.directive';
-
+import { ContactComponent } from './info/contact.component';
+import { GeneralDataService } from './general-data.service';
 import { HomeComponent } from './home/home.component';
 
 import { CredModule } from './cred/cred.module';
@@ -36,7 +34,7 @@ import { environment } from '../environments/environment';
 
 const ROUTE_PREFIX : string = 'ROUTES.';
 
-const appInitializerFn = (appConfig: AppConfigService) => {
+export const appInitializerFn = (appConfig: AppConfigService) => {
   return () => {
     return appConfig.loadFromPromise(
       import(/* webpackMode: "eager" */ `../themes/_active/assets/config.json`));
@@ -84,17 +82,14 @@ export class MyMissingTranslationHandler implements MissingTranslationHandler {
     AppComponent,
     AppHeaderComponent,
     AppFooterComponent,
-    SearchBoxDirective,
-    BreadcrumbComponent,
+    ContactComponent,
     HomeComponent,
-    PageScrollComponent,
   ],
   imports: [
     BrowserModule,
     FormsModule,
     HttpClientModule,
     AppRoutingModule,
-    AdminModule,
     CredModule,
     SearchModule,
     TopicModule,
@@ -104,7 +99,7 @@ export class MyMissingTranslationHandler implements MissingTranslationHandler {
         useClass: WebpackTranslateLoader
       }
     }),
-    LocalizeRouterModule.forRoot(routes, {
+    LocalizeRouterModule.forRoot(ROUTES, {
       parser: {
         provide: LocalizeParser,
         useClass: WebpackLocalizeRouterLoader,
@@ -112,6 +107,7 @@ export class MyMissingTranslationHandler implements MissingTranslationHandler {
       }
     }),
     NgbModule.forRoot(),
+    UtilModule,
   ],
   exports: [
     CredModule,

@@ -3,7 +3,6 @@ import { LocationStrategy } from '@angular/common';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { LocalizeRouterService } from 'localize-router';
-import { BreadcrumbComponent } from './breadcrumb/breadcrumb.component';
 import { GeneralDataService } from './general-data.service';
 import { LangChangeEvent, TranslateService } from '@ngx-translate/core';
 import { Subscription } from 'rxjs/Subscription';
@@ -40,6 +39,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private _onLangChange: Subscription;
   private _isPopState: boolean;
   private _currentRecord: any;
+  private _prevRoute: string;
 
   constructor(
     public _el: ElementRef,
@@ -69,6 +69,14 @@ export class AppComponent implements OnInit, OnDestroy {
       this.updateTitle();
     });
 
+    let scrollWindow = function(top) {
+      try {
+        window.scrollTo({top: top || 0, left: 0, behavior: 'smooth'});
+      } catch(e) {
+        window.scrollTo(0, top || 0);
+      }
+    };
+
     this._router.events
       .filter((event) => event instanceof NavigationEnd)
       .map(() => this._route)
@@ -77,14 +85,33 @@ export class AppComponent implements OnInit, OnDestroy {
         return route;
       })
       .filter((route) => route.outlet === 'primary')
-      .pipe(mergeMap((route) => route.data))
-      .subscribe((data) => {
+      .subscribe((route) => {
+        let data = route.snapshot.data;
+        let fragment = route.snapshot.fragment;
+        let routePath = route.snapshot.routeConfig.path;
         if (!this._isPopState) {
           // scroll to page top only when navigating to a new page (not via history state)
-          window.scrollTo(0, 0);
+          // skip when fragment (anchor name) is set
+          let outer = null;
+          if(fragment) {
+            outer = document.getElementById(fragment);
+          }
+          if(! outer) {
+            outer = document.getElementById('primaryOutlet');
+          }
+          if(! outer) {
+            outer = document.getElementsByTagName('main')[0];
+          }
+          let top = outer && (<HTMLElement>outer).offsetTop;
+          if(top) {
+            if(window.scrollY > top) scrollWindow(top);
+          } else {
+            scrollWindow(0);
+          }
         }
         this._isPopState = false;
         this._currentRecord = null;
+        this._prevRoute = routePath;
 
         let title = data['title'] || data['breadcrumb'];
         this.titleLabel = title;
