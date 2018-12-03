@@ -1,8 +1,10 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import { AppConfigService } from '../app-config.service';
 import { GeneralDataService } from '../general-data.service';
 import { Fetch, Model } from '../data-types';
 import { Subscription } from 'rxjs/Subscription';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 
 @Component({
   selector: 'topic-form',
@@ -12,11 +14,11 @@ import { Subscription } from 'rxjs/Subscription';
 export class TopicFormComponent implements OnInit, OnDestroy {
   source_type: string;
   source_id: string;
-  loaded: boolean;
-  loading: boolean;
   credsFormat: string = 'rows';
   _filterActive: boolean = true;
+  _modal = null;
   showFilters: boolean = false;
+  _sectionsLoaded = {};
 
   private _loader = new Fetch.ModelLoader(Model.TopicFormatted);
 
@@ -25,7 +27,9 @@ export class TopicFormComponent implements OnInit, OnDestroy {
   private _idSub: Subscription;
 
   constructor(
+    private _config: AppConfigService,
     private _dataService: GeneralDataService,
+    private _modalService: NgbModal,
     private _route: ActivatedRoute,
     private _router: Router) { }
 
@@ -39,6 +43,9 @@ export class TopicFormComponent implements OnInit, OnDestroy {
       let ident = this.ident;
       this._dataService.loadRecord(this._loader, ident, {primary: true});
     });
+    let format = this._config.getConfig().TOPIC_CREDS_FORMAT;
+    if(format)
+      this.credsFormat = format;
   }
 
   ngOnDestroy() {
@@ -66,7 +73,7 @@ export class TopicFormComponent implements OnInit, OnDestroy {
   }
 
   get names(): Model.Name[] {
-    return this.loaded && this.topic.names;
+    return this.topic && this.topic.names;
   }
 
   get result$() {
@@ -92,6 +99,54 @@ export class TopicFormComponent implements OnInit, OnDestroy {
       revoked: this._filterActive ? 'false': '',
     };
     this._dataService.loadList(this._creds, {query: credsFilter});
+  }
+
+  protected onLoadSection(name, state?) {
+    this._sectionsLoaded[name] = state === undefined ? true : state;
+  }
+
+  protected isLoaded(...sections: string[]) {
+    if(! sections) sections = ['all'];
+    for(let s of sections) {
+      let state = null;
+      if(s === 'all') {
+        if(this._loader.result.error)
+          state = true;
+        else
+          state = this.isLoaded('topic', 'related_to', 'related_from' /*, 'creds'*/);
+      } else if(s === 'topic') {
+        state = this._loader.result.loaded;
+      } else {
+        state = (s in this._sectionsLoaded);
+      }
+      if(! state)
+        return false;
+    }
+    return true;
+  }
+
+  get shareLink() {
+    if(this.topic) {
+      let link = this.topic.link;
+      return location.origin + link.join('');
+    }
+  }
+
+  copyShareLink(input) {
+    if(input) {
+      input.select();
+      document.execCommand('copy');
+    }
+  }
+
+  protected openModal(content, evt?) {
+    this._modal = this._modalService.open(content, { size: 'sm' });
+    if(evt) evt.preventDefault();
+  }
+
+  protected dismissModal(reason?) {
+    //if(this._modalActive) this._modalActive.dismiss(reason);
+    if(this._modal) this._modal.dismiss(reason);
   }
 
 }

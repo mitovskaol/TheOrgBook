@@ -5,7 +5,6 @@ import { Fetch, Filter, Model } from '../data-types';
 import { CredListComponent } from '../cred/list.component';
 import { SearchInputComponent } from './input.component';
 import { Subscription } from 'rxjs/Subscription';
-import { TranslateService } from '@ngx-translate/core';
 
 
 const FilterSpec = [
@@ -70,23 +69,36 @@ export class SearchComponent implements OnInit, OnDestroy, AfterViewInit {
   @ViewChild('credList') _nameList: CredListComponent;
   protected _filters = new Filter.FieldSet(FilterSpec);
   protected _filterType: string;
+  protected _firstFilter = true;
+  protected _lastQueryParams = null;
   protected _loader = new Fetch.ModelListLoader(Model.CredentialFacetSearchResult, {persist: true});
   protected _querySub: Subscription;
   protected _typeSub: Subscription;
   protected _inited = false;
+  protected _refresh = false;
 
   constructor(
     private _dataService: GeneralDataService,
     private _route: ActivatedRoute,
     private _router: Router,
-    private _translate: TranslateService,
   ) {}
 
   ngOnInit() {
     this._filters.stream.subscribe(fs => {
       if(this._inited) {
         let queryParams = this._filters.queryParams;
-        this._router.navigate([], { relativeTo: this._route, queryParams, queryParamsHandling: 'merge' });
+        if(JSON.stringify(queryParams) == JSON.stringify(this._lastQueryParams)) {
+          if(this._refresh) {
+            this._refresh = false;
+            this._performSearch();
+          }
+          return;
+        }
+        // performs a replace URL when filters are first initialized, to preserve back button behaviour
+        this._router.navigate([], { replaceUrl: this._firstFilter, relativeTo: this._route, queryParams, queryParamsHandling: 'merge' });
+        this._firstFilter = false;
+        this._lastQueryParams = queryParams;
+        this._refresh = false;
       }
     });
     this._querySub = this._route.queryParams.subscribe(params => {
@@ -145,43 +157,8 @@ export class SearchComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   public handleFacets(data) {
-    let fields = data.info.facets.fields;
-    let options = {
-      credential_type_id: [],
-      issuer_id: [],
-      'category:entity_type': [],
-    };
-    if(fields) {
-      for(let optname in fields) {
-        for(let optitem of fields[optname]) {
-          let optidx = optname;
-          let optval: Filter.Option = {label: optitem.text, value: optitem.value, count: optitem.count};
-          if(optname == 'category') {
-            if(! optitem.count)
-              // skip empty category values
-              continue;
-            let optparts = optitem.value.split('::', 2);
-            if(optparts.length == 2) {
-              optidx = optname + ':' + optparts[0];
-              let lblkey = `category.${optparts[0]}.${optparts[1]}`;
-              let label = this._translate.instant(lblkey);
-              if(label === lblkey || label === `??${lblkey}??`)
-                label = optparts[1];
-              optval = {
-                label,
-                value: optparts[1],
-                count: optitem.count,
-              };
-            }
-          }
-          if(optidx in options) {
-            options[optidx].push(optval);
-          }
-        }
-      }
-    }
+    let options = this._dataService.loadFacetOptions(data);
     for(let name in options) {
-      options[name].sort((a,b) => a.label.localeCompare(b.label));
       this._filters.setOptions(name, options[name]);
     }
   }
@@ -198,6 +175,7 @@ export class SearchComponent implements OnInit, OnDestroy, AfterViewInit {
 
   public updateQuery() {
     if(this._searchInput) {
+      this._refresh = true;
       this._filters.update({
         name: this._searchInput.value,
         page: '1'

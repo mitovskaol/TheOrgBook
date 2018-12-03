@@ -6,7 +6,7 @@
     "breadcrumb": "Home",
     "header": {
       "title": "OrgBook",
-      "logo-alt-text": "B.C. Government Logo"
+      "logo-alt-text": "OrgBook Logo"
     },
     "footer": {
       "disclaimer": "Disclaimer",
@@ -21,16 +21,17 @@
   "address": {
     "registered-office": "Registered Office"
   },
+  "connect": {
+    "breadcrumb": "Connect with us",
+    "contact-title": "Contact Us",
+    "title": "Connect with us"
+  },
   "contact": {
     "email": "Email Address",
     "phone": "Phone",
     "phone-business": "Business Phone",
     "skype": "Skype Address",
     "website": "Website Address"
-  },
-  "contact": {
-    "breadcrumb": "Contact",
-    "title": "Connect with Us"
   },
   "cred": {
     "addresses": "Addresses",
@@ -47,7 +48,7 @@
     "expired-message": "This credential is expired and no longer verifiable.",
     "history-link": "See history",
     "inactive": "Archived",
-    "inactive-message": "This credential has been issued for archival purposes only. It does not represent a currently active registration, permit, or license.",
+    "inactive-message": "This credential has been issued for archival purposes only. It does not represent a currently active registration, permit, or licence.",
     "issuer": "Issuer",
     "last-updated": "Last Updated",
     "latest-link": "Go to the latest credential",
@@ -67,9 +68,12 @@
     "view-link": "View credential",
     "whats-this-link": "What's this?",
     "verified": "Verified",
+    "verify-breadcrumb": "Credential Verification",
+    "verify-link": "Verify and show credential details",
     "verify-status": "Verification Status:"
   },
   "general": {
+    "about-site-title": "About this site",
     "date-entered": "Date Entered",
     "display-cards": "Cards",
     "display-list": "List",
@@ -77,6 +81,8 @@
     "hide-filters": "Hide Filters",
     "details": "Details",
     "feedback-link": "Submit Feedback",
+    "feedback-title": "Submit Feedback",
+    "feedback-button-label": "Submit",
     "links-title": "External Links and Resources",
     "map-link": "Show on map",
     "next-link": "Next",
@@ -84,21 +90,27 @@
     "not-found": "This record could not be located.",
     "other-error": "An unknown error occurred.",
     "period-current": "Current",
-    "period-historical": "Past",
+    "period-historical": "Archived",
     "prev-link": "Previous",
+    "share-link": "Share",
+    "share-title": "Share Link",
     "show-filters": "Show Filters",
-    "show-inactive": "Show Past",
+    "show-inactive": "Show Archived",
     "show-revoked": "Show Revoked",
+    "skip-link-about": "Skip to \"About this site\"",
+    "skip-link-content": "Skip to main content",
     "status-nonrevoked": "Not Revoked",
     "status-revoked": "Revoked",
     "status-any": "Any",
     "verified": "Verified"
   },
   "home": {
+    "about-title": "About the OrgBook",
     "breadcrumb": "Home",
     "title": "Welcome to The OrgBook",
-    "title-certs": "verifiable credentials held",
-    "title-orgs": "legal entities"
+    "title-certs": "Verifiable credentials held",
+    "title-orgs": "Active legal entities",
+    "title-this-week": "Credentials added this week"
   },
   "issuer": {
     "breadcrumb": "Issuer Service",
@@ -132,6 +144,7 @@
     "breadcrumb": "Search",
     "by-name": "Search by Name",
     "by-location": "Search by Location",
+    "input-label": "Organization Name or Registration ID",
     "no-results": "No results",
     "placeholder": "search",
     "prompt": "Please enter your search query above in order to proceed.",
@@ -140,7 +153,7 @@
     "results-title": "Search Results",
     "return-link": "Back to Search",
     "running": "Performing search ...",
-    "title": "Find an Organization"
+    "title": "Find an organization"
   },
   "topic": {
     "breadcrumb": "Organization",

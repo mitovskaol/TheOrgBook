@@ -185,6 +185,8 @@ STATIC_ROOT = os.path.join(BASE_DIR, "static")
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# Set up support for proxy headers (provide correct URL in swagger UI)
+USE_X_FORWARDED_HOST = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 LOGGING = {
@@ -250,12 +252,12 @@ INDY_HOLDER_ID = "TheOrgBook_Holder"
 APPLICATION_URL = os.getenv("APPLICATION_URL") or "http://localhost:8080"
 
 API_METADATA = {
-    "title": "TheOrgBook API",
+    "title": "OrgBook BC API",
     "description":
-        "TheOrgBook is a public, searchable directory of digital records for registered "
+        "OrgBook BC is a public, searchable directory of digital records for registered "
         "businesses in the Province of British Columbia. Over time, other government "
         "organizations and businesses will also begin to issue digital records through "
-        "TheOrgBook. For example, permits and licenses issued by various government services.",
+        "OrgBook BC. For example, permits and licenses issued by various government services.",
     "terms": {
         "url": "https://www2.gov.bc.ca/gov/content/data/open-data",
     },
@@ -268,6 +270,12 @@ API_METADATA = {
     },
 }
 
+#
+# Read settings from a custom settings file
+# based on the path provided as an input parameter
+# The choice of the custom settings file is driven by the value of the TOB_THEME env
+# variable (i.e. ongov)
+#
 custom_settings_file = Path(
     BASE_DIR,
     "custom_settings_" + str(os.getenv("TOB_THEME")).lower() + ".py",

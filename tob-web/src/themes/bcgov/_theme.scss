@@ -12,7 +12,7 @@ main {
   padding: 0;
 }
 
-a.body-link, .breadcrumb a {
+a.body-link, a.title-link, .breadcrumb a {
   border-bottom: 1px solid rgba($link-color, 0.8);
   margin-bottom: -1px;
   text-decoration: none;
@@ -22,13 +22,17 @@ a.body-link, .breadcrumb a {
   }
 }
 
+.title-link {
+  font-size: 110%;
+}
+
 .hero-banner, .footer-detail {
   padding: 2px 0; // prevent margin collapse
 
   background: theme-color(primary);
   color: #fff;
 
-  h1, h2, h3 {
+  h1, .h1, h2, .h2, h3, .h3 {
     font-weight: normal;
   }
 
@@ -39,7 +43,7 @@ a.body-link, .breadcrumb a {
     }
   }
 
-  a.body-link, .breadcrumb a {
+  a.body-link, a.title-link, .breadcrumb a {
     border-bottom: 1px solid rgba($banner-link-color, 0.8);
     @include hover-focus {
       border-bottom-color: $banner-link-hover;
@@ -49,10 +53,7 @@ a.body-link, .breadcrumb a {
 
 .footer-detail {
   border-top: 2px solid theme-color(bcgold);
-  font-size: 0.9rem;
-  h4 {
-    font-size: 1.1rem;
-  }
+  font-size: 0.95rem;
   + nav {
     border-top: none;
   }
@@ -60,4 +61,21 @@ a.body-link, .breadcrumb a {
 
 .lead {
   font-weight: 300;
+}
+
+$small-header-ratio: 0.9;
+
+@include media-breakpoint-down(sm) {
+  h1, .h1 {
+    font-size: ($h1-font-size * $small-header-ratio);
+  }
+  h2, .h2 {
+    font-size: ($h2-font-size * $small-header-ratio);
+  }
+  h3, .h3 {
+    font-size: ($h3-font-size * $small-header-ratio);
+  }
+  h4, .h4 {
+    font-size: ($h4-font-size * $small-header-ratio);
+  }
 }

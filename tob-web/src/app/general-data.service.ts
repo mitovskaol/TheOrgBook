@@ -7,7 +7,7 @@ import { Subscription } from 'rxjs/Subscription';
 import { map, catchError } from 'rxjs/operators';
 import { _throw } from 'rxjs/observable/throw';
 import { environment } from '../environments/environment';
-import { Fetch, Model } from './data-types';
+import { Fetch, Filter, Model } from './data-types';
 
 
 @Injectable()
@@ -49,7 +49,25 @@ export class GeneralDataService {
   }
 
   loadJson(url, params?: HttpParams) : Observable<Object> {
-    return this._http.get(url, {params: params})
+    return this._http.get(url, {params})
+      .pipe(catchError(error => {
+        console.error("JSON load error", error);
+        return _throw(error);
+      }));
+  }
+
+  postJson(url, payload, params?: HttpParams) : Observable<Object> {
+    let headers = {'Content-Type': 'application/json'};
+    return this._http.post(url, JSON.stringify(payload), {headers, params})
+      .pipe(catchError(error => {
+        console.error("JSON load error", error);
+        return _throw(error);
+      }));
+  }
+
+  postParams(url, params: {[key: string]: string}|HttpParams) : Observable<Object> {
+    let body = this.makeHttpParams(params);
+    return this._http.post(url, body)
       .pipe(catchError(error => {
         console.error("JSON load error", error);
         return _throw(error);
@@ -84,6 +102,11 @@ export class GeneralDataService {
         if(data.counts) {
           for (let k in data.counts) {
             this._recordCounts[k] = parseInt(data.counts[k]);
+          }
+        }
+        if(data.credential_counts) {
+          for (let k in data.credential_counts) {
+            this._recordCounts[k] = parseInt(data.credential_counts[k]);
           }
         }
         if(data.records) {
@@ -199,6 +222,48 @@ export class GeneralDataService {
       }
       fetch.loadFrom(this.loadJson(url, httpParams), {url: url});
     }
+  }
+
+  public loadFacetOptions(data) {
+    let fields = data.info && data.info.facets && data.info.facets.fields || {};
+    let options = {
+      credential_type_id: [],
+      issuer_id: [],
+      'category:entity_type': [],
+    };
+    if(fields) {
+      for(let optname in fields) {
+        for(let optitem of fields[optname]) {
+          if(! optitem.count)
+            // skip facets with no results
+            continue;
+          let optidx = optname;
+          let optval: Filter.Option = {label: optitem.text, value: optitem.value, count: optitem.count};
+          if(optname == 'category') {
+            let optparts = optitem.value.split('::', 2);
+            if(optparts.length == 2) {
+              optidx = optname + ':' + optparts[0];
+              let lblkey = `category.${optparts[0]}.${optparts[1]}`;
+              let label = this._translate.instant(lblkey);
+              if(label === lblkey || label === `??${lblkey}??`)
+                label = optparts[1];
+              optval = {
+                label,
+                value: optparts[1],
+                count: optitem.count,
+              };
+            }
+          }
+          if(optidx in options) {
+            options[optidx].push(optval);
+          }
+        }
+      }
+    }
+    for(let name in options) {
+      options[name].sort((a,b) => a.label.localeCompare(b.label));
+    }
+    return options;
   }
 
   onCurrentResult(sub): Subscription {
