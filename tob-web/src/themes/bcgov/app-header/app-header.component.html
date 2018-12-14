@@ -5,7 +5,7 @@
   <a href="#footerAbout" class="a11y-link" (click)="moveFocus($event, 'footerAbout');">
     <span class="content" translate>general.skip-link-about</span>
   </a>
-  <nav class="navbar navbar-expand-md navbar-dark">
+  <nav class="navbar navbar-expand-lg navbar-dark">
     <div class="container">
       <a class="navbar-brand" [routerLink]="'/' | localize">
 
@@ -17,7 +17,7 @@
           [alt]="'app.header.logo-alt-text' | translate">
       </a>
       <div class="navbar-brand">
-        <span translate>app.header.title</span>
+        <span class="title" translate>app.header.title</span>
         <span class="tag">PUBLIC BETA</span>
       </div>
       <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavAltMarkup" aria-controls="navbarNavAltMarkup"
@@ -34,4 +34,7 @@
       </div>
     </div>
   </nav>
+  <div *ngIf="parent.showDebugMsg" class="debug-msg">
+    Development site
+  </div>
 </header>

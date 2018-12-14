@@ -116,6 +116,7 @@ export namespace Model {
     latest: boolean;
     revoked: boolean;
     revoked_date: string;
+    last_issue_date: string;
 
     addresses: Address[];
     _attributes: Attribute[];
@@ -167,6 +168,12 @@ export namespace Model {
     }
     get haveNames() {
       return this.names && this.names.length;
+    }
+
+    get link() {
+      if(this.topic) {
+        return this.topic.link.concat(['/cred/', ''+this.id]);
+      }
     }
   }
 

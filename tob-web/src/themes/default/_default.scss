@@ -4,6 +4,13 @@
   min-height: 20em;
 }
 
+h3, h4, h5 {
+  &.control-label {
+    cursor: default;
+    font-size: $font-size-base;
+  }
+}
+
 @keyframes spin {
 	from {
 		transform: rotate(0);
@@ -62,6 +69,11 @@ $indicator-thickness: 0.2em;
 .text-identifier {
 	font-family: $font-family-monospace;
 	font-size: 95%;
+}
+
+.text-help {
+  font-weight: normal;
+  color: $text-muted;
 }
 
 @keyframes loading {

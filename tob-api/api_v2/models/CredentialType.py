@@ -15,10 +15,13 @@ class CredentialType(Auditable):
     credential_def_id = models.TextField(db_index=True, null=True)
     logo_b64 = models.TextField(null=True)
     visible_fields = models.TextField(null=True)
+    last_issue_date = models.DateTimeField(null=True)
+    url = models.TextField(blank=True, null=True)
 
     class Meta:
         db_table = "credential_type"
         unique_together = (("schema", "issuer"),)
+        ordering = ('id',)
 
     def get_has_logo(self):
         return bool(self.logo_b64 or (self.issuer and self.issuer.logo_b64))

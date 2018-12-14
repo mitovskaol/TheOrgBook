@@ -270,6 +270,19 @@ API_METADATA = {
     },
 }
 
+# Words 4 characters and over that shouldn't be considered significant when searching
+SEARCH_SKIP_WORDS = [
+    'assoc', 'association',
+    'company', 'corp', 'corporation',
+    'enterprise', 'enterprises', 'entreprise', 'entreprises',
+    'incorporated', 'incorporée', 'incorporation',
+    'limited', 'limitée',
+]
+
+# Return partial matches
+SEARCH_TERMS_EXCLUSIVE = False
+
+
 #
 # Read settings from a custom settings file
 # based on the path provided as an input parameter
