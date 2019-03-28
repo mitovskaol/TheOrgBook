@@ -67,10 +67,9 @@ INSTALLED_APPS = [
     "drf_generators",
     "drf_yasg",
     "django_filters",
-    "auditable",
     "api",
-    "tob_api",
     "api_v2",
+    "tob_api",
     "corsheaders",
 ]
 
@@ -83,6 +82,7 @@ else:
     print("Realtime indexing has been disabled ...")
 
 HAYSTACK_DOCUMENT_FIELD = "document"
+HAYSTACK_MAX_RESULTS = 200
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

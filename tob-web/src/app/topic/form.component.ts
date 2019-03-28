@@ -35,6 +35,24 @@ export class TopicFormComponent implements OnInit, OnDestroy {
     this._loader.ready.subscribe(result => {
       this._fetchCreds();
     });
+    this._loader.postProc(val => new Promise(resolve => {
+      if(val && val.data) {
+        let ids = {};
+        let attrs = val.data.attributes;
+        if(attrs) {
+          for(let row of attrs) {
+            if(row.credential_type_id)
+              ids[row.credential_type_id] = 1;
+          }
+        }
+        if(ids) {
+          return this._dataService.preloadCredentialTypeLanguage(...Object.keys(ids)).then(_ => {
+            resolve(val);
+          });
+        }
+      }
+      resolve(val);
+    }));
     this._idSub = this._route.params.subscribe(params => {
       this.source_type = params['sourceType'];
       this.source_id = params['sourceId'];
@@ -111,7 +129,7 @@ export class TopicFormComponent implements OnInit, OnDestroy {
         if(this._loader.result.error)
           state = true;
         else
-          state = this.isLoaded('topic', 'related_to', 'related_from' /*, 'creds'*/);
+          state = this.isLoaded('topic', /*'related_to', */ 'related_to_relations' /*, 'related_from', 'creds'*/);
       } else if(s === 'topic') {
         state = this._loader.result.loaded;
       } else {

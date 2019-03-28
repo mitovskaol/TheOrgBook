@@ -14,6 +14,7 @@ from api_v2.serializers.rest import (
     SchemaSerializer,
     CredentialTypeSerializer,
     TopicSerializer,
+    TopicRelationshipSerializer,
     CredentialSerializer,
     ExpandedCredentialSerializer,
     ExpandedCredentialSetSerializer,
@@ -29,12 +30,13 @@ from drf_yasg.utils import swagger_auto_schema
 
 from django_filters import rest_framework as filters
 
-from api_v2.serializers.search import CustomTopicSerializer
+from api_v2.serializers.search import CustomTopicSerializer, CustomTopicRelationshipSerializer
 
 from api_v2.models.Issuer import Issuer
 from api_v2.models.Schema import Schema
 from api_v2.models.CredentialType import CredentialType
 from api_v2.models.Topic import Topic
+from api_v2.models.TopicRelationship import TopicRelationship
 from api_v2.models.Credential import Credential
 from api_v2.models.Address import Address
 from api_v2.models.Attribute import Attribute
@@ -91,6 +93,16 @@ class CredentialTypeViewSet(ReadOnlyModelViewSet):
             raise Http404()
         # FIXME - need to store the logo mime type
         return HttpResponse(logo, content_type="image/jpg")
+
+    @detail_route(url_path="language", methods=["get"])
+    def fetch_language(self, request, pk=None):
+        cred_type = get_object_or_404(self.queryset, pk=pk)
+        lang = {
+            "category_labels": cred_type.category_labels,
+            "claim_descriptions": cred_type.claim_descriptions,
+            "claim_labels": cred_type.claim_labels,
+        }
+        return Response(lang)
 
 
 class TopicViewSet(ReadOnlyModelViewSet):
@@ -152,6 +164,22 @@ class TopicViewSet(ReadOnlyModelViewSet):
         source_id = self.kwargs.get("source_id")
         if not type or not source_id:
             raise Http404()
+
+        queryset = self.filter_queryset(self.get_queryset())
+        obj = get_object_or_404(queryset, type=type, source_id=source_id)
+
+        # May raise a permission denied
+        self.check_object_permissions(self.request, obj)
+        return obj
+
+
+class TopicRelationshipViewSet(ReadOnlyModelViewSet):
+    serializer_class = TopicRelationshipSerializer
+    queryset = TopicRelationship.objects.all()
+
+    def get_object(self):
+        if self.kwargs.get("pk"):
+            return super(TopicRelationshipViewSet, self).get_object()
 
         queryset = self.filter_queryset(self.get_queryset())
         obj = get_object_or_404(queryset, type=type, source_id=source_id)
@@ -230,5 +258,6 @@ class NameViewSet(ReadOnlyModelViewSet):
 # Add environment specific endpoints
 try:
     utils.apply_custom_methods(TopicViewSet, "views", "TopicViewSet", "includeMethods")
+    utils.apply_custom_methods(TopicRelationshipViewSet, "views", "TopicRelationshipViewSet", "includeMethods")
 except:
     pass

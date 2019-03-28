@@ -1,5 +1,6 @@
 import logging
 
+from django.http import Http404
 from rest_framework import permissions
 from rest_framework.decorators import list_route
 from rest_framework.response import Response
@@ -29,6 +30,7 @@ from api_v2.serializers.search import (
     CredentialTopicSearchSerializer,
 )
 from tob_api.pagination import ResultLimitPagination
+from django.conf import settings
 
 LOGGER = logging.getLogger(__name__)
 
@@ -83,7 +85,10 @@ class NameAutocompleteView(HaystackViewSet):
     ]
     @swagger_auto_schema(manual_parameters=_swagger_params)
     def list(self, *args, **kwargs):
-        return super(NameAutocompleteView, self).list(*args, **kwargs)
+        print(' >>> calling autocomplete')
+        ret = super(NameAutocompleteView, self).list(*args, **kwargs)
+        print(' >>> autocomplete returns', ret)
+        return ret
     retrieve = None
 
     index_models = [Credential]
@@ -165,11 +170,30 @@ class CredentialSearchView(HaystackViewSet, FacetMixin):
     ]
     @swagger_auto_schema(manual_parameters=_swagger_params)
     def list(self, *args, **kwargs):
-        return super(CredentialSearchView, self).list(*args, **kwargs)
+        print(" >>> calling credentialsearch")
+        if self.object_class is TopicSearchQuerySet:
+            query = self.request.GET.get('name')
+            topic_id = self.request.GET.get('topic_id')
+            if not self.valid_search_query(query, topic_id):
+                raise Http404()
+        ret = super(CredentialSearchView, self).list(*args, **kwargs)
+        print(" >>> credentialsearch returns", ret)
+        return ret
 
     @swagger_auto_schema(manual_parameters=_swagger_params)
     def retrieve(self, *args, **kwargs):
-        return super(CredentialSearchView, self).retrieve(*args, **kwargs)
+        print(" >>> calling credentialsearch retrieve")
+        ret = super(CredentialSearchView, self).retrieve(*args, **kwargs)
+        print(" >>> credentialsearch retrieve returns", ret)
+        return ret
+
+    def valid_search_query(self, query, topic_id):
+        is_valid = False
+        if isinstance(query, str) and len(query.strip()) >= 2:
+            is_valid = True
+        if isinstance(topic_id, str) and len(topic_id.strip()) > 0:
+            is_valid = True
+        return is_valid
 
     index_models = [Credential]
     load_all = True
@@ -218,6 +242,8 @@ class CredentialSearchView(HaystackViewSet, FacetMixin):
         return Response(serializer.data)
 
 
+LIMIT = getattr(settings, 'HAYSTACK_MAX_RESULTS', 200)
+
 class TopicSearchQuerySet(RelatedSearchQuerySet):
     """
     Optimize queries when fetching topic-oriented credential search results
@@ -227,6 +253,13 @@ class TopicSearchQuerySet(RelatedSearchQuerySet):
         super(TopicSearchQuerySet, self).__init__(*args, **kwargs)
         self._load_all_querysets[Credential] = self.topic_queryset()
 
+    def __len__(self):
+        ret = super(TopicSearchQuerySet, self).__len__()
+        if ret > LIMIT:
+            print(" >>> Limiting the query LEN", ret, LIMIT)
+            ret = LIMIT
+        return ret
+
     def topic_queryset(self):
         return Credential.objects.select_related(
             "credential_type",
@@ -234,6 +267,23 @@ class TopicSearchQuerySet(RelatedSearchQuerySet):
             "credential_type__schema",
             "topic",
         ).all()
+
+    def _fill_cache(self, start, end, **kwargs):
+        print(" >>> Limiting the cache results", start, end, LIMIT)
+        if start is not None:
+            if start > LIMIT:
+                start = LIMIT
+        if end is not None:
+            if end > LIMIT:
+                end = LIMIT
+        super(TopicSearchQuerySet, self)._fill_cache(start, end, **kwargs)
+
+    def count(self):
+        ret = super(TopicSearchQuerySet, self).count()
+        if ret > LIMIT:
+            print(" >>> Limiting the query count", ret, LIMIT)
+            ret = LIMIT
+        return ret
 
 
 class CredentialTopicSearchView(CredentialSearchView):

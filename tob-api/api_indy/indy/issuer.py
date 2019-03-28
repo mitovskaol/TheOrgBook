@@ -68,6 +68,7 @@ class IssuerManager:
         issuer_email = issuer_def.get("email")
         issuer_url = issuer_def.get("url")
         issuer_logo = issuer_def.get("logo_b64")
+        issuer_endpoint = issuer_def.get("endpoint")
 
         issuer, created = Issuer.objects.get_or_create(did=issuer_did)
         issuer.name = issuer_name
@@ -75,6 +76,7 @@ class IssuerManager:
         issuer.email = issuer_email
         issuer.url = issuer_url
         issuer.logo_b64 = issuer_logo
+        issuer.endpoint = issuer_endpoint
         issuer.save()
 
         return issuer
@@ -103,19 +105,12 @@ class IssuerManager:
             schemas.append(schema)
 
             # Get or create credential type
-            credential_type_processor_config = {}
-            credential_type_processor_config[
-                "mapping"
-            ] = credential_type_def.get("mapping")
-            credential_type_processor_config[
-                "topic"
-            ] = credential_type_def.get("topic")
-            credential_type_processor_config[
-                "credential"
-            ] = credential_type_def.get("credential")
-            credential_type_processor_config[
-                "cardinality_fields"
-            ] = credential_type_def.get("cardinality_fields")
+            credential_type_processor_config = {
+                "cardinality_fields": credential_type_def.get("cardinality_fields"),
+                "credential": credential_type_def.get("credential"),
+                "mapping": credential_type_def.get("mapping"),
+                "topic": credential_type_def.get("topic"),
+            }
 
             credential_type, _ = CredentialType.objects.get_or_create(
                 schema=schema, issuer=issuer
@@ -123,6 +118,9 @@ class IssuerManager:
 
             credential_type.description = credential_type_def.get("name")
             credential_type.processor_config = credential_type_processor_config
+            credential_type.category_labels = credential_type_def.get("category_labels")
+            credential_type.claim_descriptions = credential_type_def.get("claim_descriptions")
+            credential_type.claim_labels = credential_type_def.get("claim_labels")
             credential_type.logo_b64 = credential_type_def.get("logo_b64")
             credential_type.credential_def_id = credential_type_def.get("credential_def_id")
             credential_type.url = credential_type_def.get("endpoint")

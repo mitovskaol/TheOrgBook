@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
 
-from auditable.models import Auditable
+from .Auditable import Auditable
 
 
 class Credential(Auditable):
@@ -41,6 +41,28 @@ class Credential(Auditable):
         if key not in cache:
             cache[key] = val
         return cache[key]
+
+    def get_local_name(self):
+        names = self.all_names
+        remote_name = None
+        for name in names:
+            if name.type == 'entity_name_assumed':
+                return name
+            else:
+                remote_name = name
+        return remote_name
+
+    def get_remote_name(self):
+        names = self.all_names
+        has_assumed_name = False
+        remote_name = None
+        for name in names:
+            if name.type == 'entity_name_assumed':
+                has_assumed_name = True
+            else:
+                remote_name = name
+        if has_assumed_name:
+            return remote_name
 
     # used by solr document index
     @property
